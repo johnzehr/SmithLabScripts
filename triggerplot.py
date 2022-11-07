@@ -9,12 +9,13 @@ rm = pyvisa.ResourceManager()
 rm.list_resources()
 inst = rm.open_resource('USB0::0x0AAD::0x00C8::102457::0::INSTR') # fsw
 smw =  rm.open_resource('USB0::0x0AAD::0x0092::109917::0::INSTR') # smw200a
-smw.write(":SOURce1:FREQuency:CW 10e9")
-smw.write(":SOURce1:POWer:POWer -10")
-smw.write(':SOURce1:BB:ARBitrary:WAVeform:SELect "/var/user/waves200e62022-04-19"')
-smw.write(':SOURce1:BB:ARBitrary:STATe 1')
-inst.write(':SENS:FREQ:CENT 10e9')
-inst.query('*OPC?')
+#smw.write(":SOURce1:FREQuency:CW 10e9")
+#smw.write(":SOURce1:POWer:POWer -10")
+#smw.write(':SOURce1:BB:ARBitrary:WAVeform:SELect "/var/user/gnss/log/wavestest_chirp2022-11-04"')
+#smw.write(':SOURce1:BB:ARBitrary:STATe 1')
+#inst.write(':SENS:FREQ:CENT 10.075e9')
+#inst.query('*OPC?')
+#inst.write(":INIT:IMM;*WAI")
 
 def write_to(data):
     with open('meas.txt', 'w') as f:
@@ -29,7 +30,7 @@ def iq_trace():
     # smw.write(':SOURce1:BB:DM:STATe 1')
     smw.write(':SOURce1:BB:ARBitrary:TRIGger:EXECute')
     data = inst.query_ascii_values("TRAC:IQ:DATA:MEM?")
-    data1 = data[::2][0:2000]
+    data1 = data[::2][0:len(data)]
     data2 = data[1::2]
     time = float(inst.query('SENS:SWE:TIME?'))
     points = float(inst.query('TRAC:IQ:RLEN?'))
@@ -41,7 +42,7 @@ def iq_trace():
     plt.ylabel("mV")
     ax = plt.gca()
     plt.plot(xval, data1, color ='red')
-     
+ #   
     plt.figure(1)
     plt.title("Imaginary Values")
     plt.xlabel("Seconds")
@@ -49,8 +50,15 @@ def iq_trace():
     ax2 = plt.gca()
     plt.plot(xval, data2)
     write_to(data)
+    inst.query('*OPC?')
+    taup = 10e-6
+    b = 50e6
+    rrec = 50
+    winid=1
+    #matched_filter(taup, b, rrec, winid, data)
     return data
 
+#iq_trace()
 def matched_filter(taup, b, rrec, winid, data_arr):
 #def matched_filter(nscat,taup, b, rrec, scat_range,winid, data_arr,noise_amplitude)
     eps = 1.0e-16
@@ -68,8 +76,10 @@ def matched_filter(taup, b, rrec, winid, data_arr):
     # replica = np.exp(1j * np.pi * (b / taup) * (t ** 2))
     
     #--------------------------------------------------------------------------------------#
-    num_samp = 3000
-    clock = 1000e6
+    #num_samp = 3000
+    #clock = 1000e6
+    num_samp = 20000
+    clock= 50000
     delta_t = 1/(clock)
     T = num_samp * delta_t
     t = np.arange(0, T, delta_t)
