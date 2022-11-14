@@ -1,8 +1,16 @@
 import pyvisa, matplotlib.pyplot as plt, numpy as np
 import datetime
+import dill as pickle
 from numpy.fft import fft, fftshift
 import matplotlib.pyplot as plt
 from scipy import signal
+
+
+if __name__ == '__main__':
+    file = open("metalSheet1m.obj","r")
+    pickle.load('metalSheet1m.obj')
+    file.close()
+    exit()
 
 
 rm = pyvisa.ResourceManager()
@@ -29,6 +37,7 @@ def iq_trace():
     # smw.write(':SOURce1:BB:DM:STATe 1')
     smw.write(':SOURce1:BB:ARBitrary:TRIGger:EXECute')
     data = inst.query_ascii_values("TRAC:IQ:DATA:MEM?")
+
     data1 = data[::2][0:2000]
     data2 = data[1::2]
     time = float(inst.query('SENS:SWE:TIME?'))
@@ -68,14 +77,14 @@ def matched_filter(taup, b, rrec, winid, data_arr):
     # replica = np.exp(1j * np.pi * (b / taup) * (t ** 2))
     
     #--------------------------------------------------------------------------------------#
-    num_samp = 3000
-    clock = 1000e6
+    num_samp = 6000
+    clock = 600e6
     delta_t = 1/(clock)
     T = num_samp * delta_t
     t = np.arange(0, T, delta_t)
     
-    fstart=0
-    fstop = 200e6
+    fstart=0e6
+    fstop = 150e6
     chirp_rate = (fstop-fstart)/T
     fsig=2*np.pi*(((chirp_rate/2)*(t**2))+(fstart*t))
 
@@ -193,3 +202,4 @@ def matched_filter(taup, b, rrec, winid, data_arr):
     plt.plot(xval, data2)
 
 iq_trace()'''
+
