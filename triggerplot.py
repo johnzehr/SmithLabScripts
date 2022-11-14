@@ -6,10 +6,19 @@ import matplotlib.pyplot as plt
 from scipy import signal
 
 
+# dictionary from juypiter notebook file has the following feilds:
+# "clock" clock rate of generated pulse
+# "numberSamples" the number of samples in the pulse
+# "fstart" the start frequency of the chirp pulse in rad/sec
+# "fstop" the stop frequency of the chirp pulse in rad/sec
+# "originalPulse" the complex data from the generated pulse signal
+
+filePath = "exportData2022-11-14-10:59:42.obj"
 if __name__ == '__main__':
-    file = open("metalSheet1m.obj","r")
-    pickle.load('metalSheet1m.obj')
+    file = open(filePath, "rb")
+    importDict = pickle.load(file)
     file.close()
+
     exit()
 
 
