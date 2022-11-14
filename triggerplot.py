@@ -1,3 +1,4 @@
+import dill
 import pyvisa, matplotlib.pyplot as plt, numpy as np
 import datetime
 import dill as pickle
@@ -75,6 +76,13 @@ def iq_trace():
     rrec = 50
     winid=1
     #matched_filter(taup, b, rrec, winid, data)
+    now = datetime.datetime.now()
+    exportFilePath = 'recodedData'+now.strftime('%Y-%m-%d-%H:%M:%S')+'.obj'
+    exportDict = {"Wave Gen Data": importDict, "recorded Data": data, "time": time, "points" : points}
+    exportFile = open(exportFilePath,'wb')
+    dill.dump(exportDict,exportFile)
+    exportFile.close()
+
     return data
 
 #iq_trace()
