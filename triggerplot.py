@@ -78,7 +78,7 @@ def iq_trace():
     #matched_filter(taup, b, rrec, winid, data)
     now = datetime.datetime.now()
     exportFilePath = 'recodedData'+now.strftime('%Y-%m-%d-%H:%M:%S')+'.obj'
-    exportDict = {"wave gen data": importDict, "recorded data": data, "time": time, "points" : points}
+    exportDict = {"wave gen data": importDict, "recorded data": data, "time": time, "points" : points, "background" : []}
     exportFile = open(exportFilePath,'wb')
     dill.dump(exportDict,exportFile)
     exportFile.close()
@@ -231,8 +231,22 @@ def matched_filter(taup, b, rrec, winid, data_arr):
 
 iq_trace()'''
 
+#backgroundFile is file with backgrounded data. expFile contains the experimental data.
+# this method adds a feild to the experemental file that contains the backgrounded information
+def add_background(backgroundFile,expFile):
+    file = open(backgroundFile, "rb")
+    backGroundDict = pickle.load(file)
+    file.close()
+    backgroundSig = backGroundDict.get("recorded Data")
+    experimentalFile = open(expFile,"rb")
+    expDict = pickle.load(file)
+    experimentalFile.close()
+    expDict["background"] = backgroundSig
+    experimentalFile = open(expFile, "wb")
+    pickle.dump(expDict,expFile)
+    experimentalFile.close()
 
-def matched_filter(filePath):
+def matched_filter(filePath,backrounded):
     waveDataFile = open(filePath)
     waveDataFileDict = dill.load(waveDataFile)
     waveDataFile.close()
