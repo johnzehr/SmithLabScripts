@@ -1,33 +1,12 @@
-import dill
 import pyvisa, matplotlib.pyplot as plt, numpy as np
-import datetime
-import dill as pickle
+import dill
+import pickle
 from numpy.fft import fft, fftshift
 import matplotlib.pyplot as plt
 from scipy import signal
 
 
-# dictionary from juypiter notebook file has the following feilds:
-# "clock" clock rate of generated pulse
-# "numberSamples" the number of samples in the pulse
-# "fstart" the start frequency of the chirp pulse in rad/sec
-# "fstop" the stop frequency of the chirp pulse in rad/sec
-# "originalPulse" the complex data from the generated pulse signal
 
-filePath = "exportData2022-11-14-10:59:42.obj"
-if __name__ == '__main__':
-    file = open(filePath, "rb")
-    importDict = pickle.load(file)
-    file.close()
-
-    exit()
-
-
-rm = pyvisa.ResourceManager()
-rm.list_resources()
-inst = rm.open_resource('USB0::0x0AAD::0x00C8::102457::0::INSTR') # fsw
-smw =  rm.open_resource('USB0::0x0AAD::0x0092::109917::0::INSTR') # smw200a
-#smw.write(":SOURce1:FREQuency:CW 10e9")
 #smw.write(":SOURce1:POWer:POWer -10")
 #smw.write(':SOURce1:BB:ARBitrary:WAVeform:SELect "/var/user/gnss/log/wavestest_chirp2022-11-04"')
 #smw.write(':SOURce1:BB:ARBitrary:STATe 1')
@@ -35,23 +14,41 @@ smw =  rm.open_resource('USB0::0x0AAD::0x0092::109917::0::INSTR') # smw200a
 #inst.query('*OPC?')
 #inst.write(":INIT:IMM;*WAI")
 
+rm = pyvisa.ResourceManager()
+rm.list_resources()
+inst = rm.open_resource('USB0::0x0AAD::0x00C8::102457::0::INSTR') # fsw
+smw =  rm.open_resource('USB0::0x0AAD::0x0092::109917::0::INSTR') # smw200a
+
+def connect():
+    fileo=open('wave_info', 'rb')
+    datao=pickle.load(fileo)
+    cent = 10 + (abs(round(((datao['fstop']/(2*np.pi) - datao['fstart']/(2*np.pi))/2),4))/10**9)
+    smw.write(":SOURce1:FREQuency:CW 10e9")
+    smw.write(":SOURce1:POWer:POWer -10")
+    inst.write(':SENS:FREQ:CENT ' + str(cent) + 'e9')
+    inst.write(':TRAC:IQ:SRAT 20e9')
+    inst.write(':SENS:SWE:TIME ' + str(datao['numberSamples']/datao['clock']))
+    
+    
 def write_to(data):
     with open('meas.txt', 'w') as f:
         f.write(str(data))
 #def read_from():
     
-
-def iq_trace():
-    inst.query('*OPC?')
-    inst.write(":INIT:IMM;*WAI")
-    inst.write('TRAC:IQ:DATA:FORM IQP')
-    # smw.write(':SOURce1:BB:DM:STATe 1')
+def trigger():
     smw.write(':SOURce1:BB:ARBitrary:TRIGger:EXECute')
+    
+def iq_trace():
+    fileo=open('wave_info', 'rb')
+    datao=pickle.load(fileo)
     data = inst.query_ascii_values("TRAC:IQ:DATA:MEM?")
-
-    data1 = data[::2][0:len(data)]
-
-    data2 = data[1::2]
+#    objFile = open("MetalSheet1m", "wb")
+ #   pick.dump(data, objFile)
+    # print(pick.dump(data))
+  #  objFile.close()
+    datai = data[:int(len(data)/2)]
+    dataq = data[int(len(data)/2):]
+    data_full = datai+ np.add(datai, np.multiply(dataq, 1j))
     time = float(inst.query('SENS:SWE:TIME?'))
     points = float(inst.query('TRAC:IQ:RLEN?'))
     xval = np.arange(0, time,(time/points))
@@ -61,28 +58,26 @@ def iq_trace():
     plt.xlabel("Seconds")
     plt.ylabel("mV")
     ax = plt.gca()
-    plt.plot(xval, data1, color ='red')
+    plt.plot(xval, datai, color ='red')
  #   
     plt.figure(1)
     plt.title("Imaginary Values")
     plt.xlabel("Seconds")
     plt.ylabel("mV")
     ax2 = plt.gca()
-    plt.plot(xval, data2)
-    write_to(data)
+    plt.plot(xval, dataq)
+   # write_to(data)
+    
+    
     inst.query('*OPC?')
-    taup = 10e-6
-    b = 50e6
+    taup = datao['numberSamples']/datao['clock']
+    b = int(abs(round(datao['fstop']-datao['fstart']/(4*np.pi),3)))
     rrec = 50
     winid=1
+    
+    
+    matched_filter(taup,b, rrec, winid, data_full)
     #matched_filter(taup, b, rrec, winid, data)
-    now = datetime.datetime.now()
-    exportFilePath = 'recodedData'+now.strftime('%Y-%m-%d-%H:%M:%S')+'.obj'
-    exportDict = {"wave gen data": importDict, "recorded data": data, "time": time, "points" : points, "background" : []}
-    exportFile = open(exportFilePath,'wb')
-    dill.dump(exportDict,exportFile)
-    exportFile.close()
-
     return data
 
 #iq_trace()
@@ -103,16 +98,16 @@ def matched_filter(taup, b, rrec, winid, data_arr):
     # replica = np.exp(1j * np.pi * (b / taup) * (t ** 2))
     
     #--------------------------------------------------------------------------------------#
-
-    num_samp = 6000
-    clock = 600e6
-
+    #num_samp = 3000
+    #clock = 1000e6
+    num_samp = 20000
+    clock= 50000
     delta_t = 1/(clock)
     T = num_samp * delta_t
     t = np.arange(0, T, delta_t)
     
-    fstart=0e6
-    fstop = 150e6
+    fstart=0
+    fstop = 200e6
     chirp_rate = (fstop-fstart)/T
     fsig=2*np.pi*(((chirp_rate/2)*(t**2))+(fstart*t))
 
@@ -230,103 +225,3 @@ def matched_filter(taup, b, rrec, winid, data_arr):
     plt.plot(xval, data2)
 
 iq_trace()'''
-
-# backgroundFile is file with background data. expFile contains the experimental data.
-# this method adds a field to the experimental file that contains the background information
-def add_background(backgroundFile,expFile):
-    file = open(backgroundFile, "rb")
-    backGroundDict = pickle.load(file)
-    file.close()
-    backgroundSig = backGroundDict.get("recorded Data")
-    experimentalFile = open(expFile,"rb")
-    expDict = pickle.load(file)
-    experimentalFile.close()
-    expDict["background"] = backgroundSig
-    experimentalFile = open(expFile, "wb")
-    pickle.dump(expDict,expFile)
-    experimentalFile.close()
-
-# Matched filering method that takes in pickle file generated by iq trace.
-# backgrounded is boolean that indicates whether there is background signal in dictionary
-# the background data can be added using add_background()
-def matched_filter(filePath,backrounded):
-    waveDataFile = open(filePath)
-    waveDataFileDict = dill.load(waveDataFile)
-    waveDataFile.close()
-    eps = 1.0e-16
-    orignialPulseData = waveDataFileDict.get("wave gen data")
-    # speed of light
-    c = 3.e8
-    # hardcode the distance we are imaging over
-    rrec = 2.5
-    taup = orignialPulseData.get("fstop") - orignialPulseData.get("fstart")
-    # number of samples
-    n = waveDataFileDict.get("points")
-    replica = n * [0.0]
-
-
-    num_samp = orignialPulseData.get("numberSamples")
-    clock = orignialPulseData.get("clock")
-
-    delta_t = 1 / (clock)
-    T = num_samp * delta_t
-    t = np.arange(0, T, delta_t)
-
-    fstart = orignialPulseData.get("fstart")
-    fstop = orignialPulseData.get("fstop")
-    chirp_rate = (fstop - fstart) / T
-    signal = orignialPulseData.get("originalPulse")
-
-    replica = signal  # transmitted signal
-    # transmitted signal should be the signal generated by smw200a
-    # --------------------------------------------------------------------------------------#
-
-    # plot replica signal in time domain
-    plt.figure(1)
-    plt.subplot(2, 1, 1);
-    plt.plot(t, np.real(replica))
-    plt.ylabel('Real (part) of replica')
-    plt.xlabel('time in seconds')
-    plt.grid()
-    plt.show()
-
-    n = np.size(replica)
-    # print(n)
-
-    # determine proper window / weighing function
-    winid = 0
-    if winid == 0:
-        win = n * [1]
-        win = [[1.0] * n]
-    elif winid == 1:
-        win = np.hamming(n)
-    elif winid == 2:
-        win = np.kaiser(n, np.pi)
-    elif winid == 3:
-        win = signal.chebwin(n, 60)
-
-    data_arr = waveDataFileDict.get("recorded Data")
-#   subtract background signal if it exists in dictionary
-    if(backrounded and waveDataFileDict.get("background") != []):
-        data_arr = np.add(data_arr,waveDataFileDict.get("background"))
-    # correlate signals
-    out = np.correlate(replica, data_arr, "full")
-    out = out / n
-
-    # plot output vs distance
-    s = taup * c / 2
-    Npoints = (int)(np.ceil(rrec * n / s))
-    dist = np.linspace(0, rrec, Npoints)
-    #delr = c / 2 / b
-    # print(delr)
-
-
-
-    plt.figure(2)
-    plt.subplot(2, 1, 1)
-
-    plt.plot(dist, np.abs(out[n - 1: n + Npoints - 1]), 'k')
-    plt.xlabel('Target relative position in meters')
-    plt.ylabel('Compressed echo')
-    plt.grid()
-    plt.show()
